@@ -1,1 +1,537 @@
+- Here is some Auto code posted by sidt124
+- Original repository: https://github.com/sidt124/FTCCode/blob/main/FinalAutoV2.java
 
+-------------------------------------------------------------------------
+
+package org.firstinspires.ftc.teamcode;
+
+import java.util.List;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import java.util.Arrays;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.robotcore.hardware.IMU;
+
+
+@Autonomous
+public class FinalAutoV2 extends LinearOpMode {
+
+    public static DcMotor vsLeftMotor;
+    public static DcMotor vsRightMotor;
+    public static Servo vArmRight;
+    public static Servo vClaw;
+    public static Servo hServoLeft;
+    public static Servo hServoRight;
+    public static Servo hClawPitch;
+    public static Servo hClawRoll;
+    public static Servo hClaw;
+    public static IMU imu;
+    public static DcMotor lfMotor;
+    public static DcMotor rfMotor;
+    public static DcMotor lbMotor;
+    public static DcMotor rbMotor;
+    public static List<DcMotor> motors;
+    public static List<DcMotor> rMotors;
+    public static List<DcMotor> lMotors;
+    double hSlidesExtension = 0.7;
+    double hSlidesRetraction = 0.87;
+    double hClawUp = 0.1;
+    double hClawDown = 0.87;
+    double vArmSpecimenPickup = .05;
+    int vsSlightExtend = 500;
+    int vsSamplePlaceDistance = 3100;
+    double vArmSampleAlign = 0.15;
+    double vArmSpecimenAlign = 0.80;
+    double vClawClose = 0.1;
+    double vClawOpen = 0.5;
+    double hClawOpen = 0.2;
+    double hClawClose = 0.05;
+    final public double motorEncoderTicksPerRevolution = 537.6;
+    final public double wheelRadius = 2.047;
+    final public double wheelCircumference = 2 * wheelRadius * Math.PI;
+   
+    @Override
+    public void runOpMode() throws InterruptedException {
+        vClaw = hardwareMap.get(Servo.class, "vClaw");
+        vsLeftMotor = hardwareMap.get(DcMotor.class, "vsLeftMotor");
+        vsRightMotor = hardwareMap.get(DcMotor.class, "vsRightMotor");
+        vsLeftMotor.setDirection(DcMotor.Direction.FORWARD);
+        vsLeftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        vsLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        vsRightMotor.setDirection(DcMotor.Direction.FORWARD);
+        vsRightMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        vsRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        vArmRight = hardwareMap.get(Servo.class, "vArmRight");
+        vArmRight.setDirection(Servo.Direction.REVERSE);
+        vClaw = hardwareMap.get(Servo.class, "vClaw");
+        vClaw.setDirection(Servo.Direction.FORWARD);
+        hServoLeft = hardwareMap.get(Servo.class, "hArmLeft");
+        hServoRight = hardwareMap.get(Servo.class, "hArmRight");
+        hServoLeft.setDirection(Servo.Direction.FORWARD);
+        hServoRight.setDirection(Servo.Direction.REVERSE);
+        hClawPitch = hardwareMap.get(Servo.class, "hClawPitch");
+        hClawPitch.setDirection(Servo.Direction.FORWARD);
+        hClawRoll = hardwareMap.get(Servo.class, "hClawRoll");
+        hClawRoll.setDirection(Servo.Direction.FORWARD);
+        hClaw = hardwareMap.get(Servo.class, "hClaw");
+        hClaw.setDirection(Servo.Direction.REVERSE);
+        lfMotor = hardwareMap.get(DcMotor.class, "lfMotor");
+        lfMotor.setDirection(DcMotor.Direction.REVERSE);
+        rfMotor = hardwareMap.get(DcMotor.class, "rfMotor");
+       
+        rfMotor.setDirection(DcMotor.Direction.FORWARD);
+        lbMotor = hardwareMap.get(DcMotor.class, "lbMotor");
+        lbMotor.setDirection(DcMotor.Direction.REVERSE);
+        rbMotor = hardwareMap.get(DcMotor.class, "rbMotor");
+        rbMotor.setDirection(DcMotor.Direction.FORWARD);
+        motors = Arrays.asList(lfMotor, rfMotor, rbMotor, lbMotor);
+        rMotors = Arrays.asList(rfMotor, rbMotor);
+        lMotors = Arrays.asList(lfMotor, lbMotor);
+        imu = hardwareMap.get(IMU.class, "imu");
+        closeVertClaw();
+        imu.initialize(
+            new IMU.Parameters(new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.UP, RevHubOrientationOnRobot.UsbFacingDirection.FORWARD))
+        );
+        int currentHeading = (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180;
+        telemetry.addData("Heading: ", currentHeading);
+        telemetry.update();
+        waitForStart();
+        rbMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        lbMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        lfMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rfMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        //vArmRight.setPosition(0.75);
+        //alignSpecimenWithHighRung();
+        alignHeading(currentHeading);
+        alignSpecimenWithHighRung();
+        strafeDiagonal(145, 35, currentHeading);
+        alignHeading(currentHeading);
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        moveForward(9, currentHeading);
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        sleep(200);
+        alignHeading(currentHeading);
+        hookSpecimen();
+        sleep(300);
+        positionToPickSpecimen();
+        retractVertSlides();
+        moveBackward(5, currentHeading);
+        alignHeading(currentHeading);
+        strafeRight(40, currentHeading);
+        alignHeading(currentHeading);
+        //hookSpecimen();
+        //positionToPickSpecimen();
+        //retractVertSlides();
+        /*moveForward(15, currentHeading);
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        alignHeading(currentHeading);
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        hookSpecimen();
+        sleep(100);
+        openVertClaw();
+        positionToPickSpecimen();
+        retractVertSlides();
+        moveBackward(13, currentHeading);
+        strafeRight(49, currentHeading);
+        moveForward(34.5, currentHeading);
+        strafeRight(8.5, currentHeading);
+        moveBackward(40, currentHeading);
+        strafeLeft(8, currentHeading);
+        moveBackward(2, currentHeading);
+        openVertClaw();
+        positionToPickSpecimen();
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        sleep(1000);
+        closeVertClaw();
+        sleep(400);
+        vArmRight.setPosition(0.75);
+        strafeDiagonal(45, currentHeading);
+        alignHeading(currentHeading);
+        alignSpecimenWithHighRung();
+        moveForward(7, currentHeading);
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        alignHeading(currentHeading);
+        lbMotor.setPower(0);
+        lfMotor.setPower(0);
+        rbMotor.setPower(0);
+        rfMotor.setPower(0);
+        hookSpecimen();
+        sleep(100);
+        openVertClaw();
+        positionToPickSpecimen();
+        retractVertSlides();
+        */
+    }
+    public void strafeDiagonal(double angle, double distance, int currentHeading) {
+        int encoders = (int) ((distance * motorEncoderTicksPerRevolution) / wheelCircumference);
+        angle = angle * Math.PI/180;
+        double denominator = Math.max(Math.abs(Math.sin(angle - Math.PI / 4)), Math.abs(Math.cos(angle - Math.PI / 4)));
+        motors.forEach(motor -> {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        });
+        while (lbMotor.getCurrentPosition() < encoders) {
+            double power = Math.min(1, Math.min((encoders - lbMotor.getCurrentPosition()) / 200.0 + 0.1, lbMotor.getCurrentPosition() / 200.0 + 0.1));
+            telemetry.addData("position: ", lbMotor.getCurrentPosition());
+            telemetry.addData("power", lbMotor.getPower());
+            telemetry.addData("power offset", power * Math.sin(angle - Math.PI / 4) / denominator);
+            telemetry.update();
+            lbMotor.setPower(power * Math.sin(angle - Math.PI / 4) / denominator);
+            rfMotor.setPower(power * Math.sin(angle - Math.PI / 4) / denominator);
+            rbMotor.setPower(power * Math.cos(angle - Math.PI / 4) / denominator);
+            lfMotor.setPower(power * Math.cos(angle - Math.PI / 4) / denominator);
+        }
+    }
+
+    public void alignHeading(int targetHeading){
+        int imuX = (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180;
+        imuX = convertIMUHeading(imuX, imuX);
+        while (imuX != targetHeading) {
+            telemetry.addData("heading: ", imuX);
+            telemetry.update();
+            if (imuX < targetHeading) {
+                lfMotor.setPower(-0.1);
+                lbMotor.setPower(-0.1);
+                rfMotor.setPower(0.1);
+                rbMotor.setPower(0.1);
+                imuX = convertIMUHeading(imuX, (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180);
+            }
+            if (imuX > targetHeading) {
+                lfMotor.setPower(0.1);
+                lbMotor.setPower(0.1);
+                rfMotor.setPower(-0.1);
+                rbMotor.setPower(-0.1);
+                imuX = convertIMUHeading(imuX, (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180);
+            }
+        }
+        lfMotor.setPower(0);
+        lbMotor.setPower(0);
+        rfMotor.setPower(0);
+        rbMotor.setPower(0);
+    }
+    
+    public int convertIMUHeading(int previousHeading, int currentHeading){
+        int rotations = 0;
+       
+        if(Math.abs(previousHeading - currentHeading) > 90){
+            if(previousHeading > currentHeading){
+                rotations++;
+            }
+            else{
+                rotations--;
+            }
+        }
+        return currentHeading + 360 * rotations;
+    }
+
+    public void moveForward(double distance, int currentHeading) {
+        int encoders = (int) ((distance * motorEncoderTicksPerRevolution) / wheelCircumference);
+        motors.forEach(motor -> {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        });
+        while (lbMotor.getCurrentPosition() < encoders) {
+            double pwr = Math.abs(0.5 - (lbMotor.getCurrentPosition() / encoders));
+            double power = Math.min(1, Math.min((encoders - lbMotor.getCurrentPosition()) / 200.0 + 0.1, lbMotor.getCurrentPosition() / 200.0 + 0.1));
+            motors.forEach(motor -> {
+                motor.setPower(power);
+            });
+            telemetry.addData("Current Heading: ", currentHeading);
+            telemetry.update();
+            int imuX = (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180;
+            imuX = convertIMUHeading(imuX, imuX);
+            if (imuX < currentHeading - 1) {
+                lfMotor.setPower(power * 0.75);
+                lbMotor.setPower(power * 0.75);
+                rfMotor.setPower(power);
+                rbMotor.setPower(power);
+                imuX = convertIMUHeading(imuX, (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180);
+            }
+            if (imuX > currentHeading + 1) {
+                lfMotor.setPower(power);
+                lbMotor.setPower(power);
+                rfMotor.setPower(power * 0.75);
+                rbMotor.setPower(power * 0.75);
+                imuX = convertIMUHeading(imuX, (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180);
+            }
+        }
+    }
+   
+    public void moveBackward(double distance, int currentHeading) {
+        int encoders = (int) ((distance * motorEncoderTicksPerRevolution) / wheelCircumference);
+        motors.forEach(motor -> {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        });
+        while (Math.abs(lbMotor.getCurrentPosition()) < encoders && Math.abs(rbMotor.getCurrentPosition()) < encoders && Math.abs(lfMotor.getCurrentPosition()) < encoders && Math.abs(rfMotor.getCurrentPosition()) < encoders) {
+            double power = 0.5;
+            telemetry.addData("Power: ", lbMotor.getPower());
+            telemetry.update();
+            //pr("status", "power: " + power + " | encoders: " + encoders + " | currentPos: " + lbMotor.getCurrentPosition());
+            motors.forEach(motor -> {
+                motor.setPower(-power);
+            });
+           
+           
+            int imuX = (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180;
+            imuX = convertIMUHeading(imuX, imuX);
+            if (imuX < currentHeading - 1) {
+                lfMotor.setPower(-power);
+                lbMotor.setPower(-power);
+                rfMotor.setPower(-power * 0.75);
+                rbMotor.setPower(-power * 0.75);
+                imuX = convertIMUHeading(imuX, (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180);
+            }
+            if (imuX > currentHeading + 1) {
+                lfMotor.setPower(-power * 0.75);
+                lbMotor.setPower(-power * 0.75);
+                rfMotor.setPower(-power);
+                rbMotor.setPower(-power);
+                imuX = convertIMUHeading(imuX, (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180);
+            }
+        }
+    }
+   
+   
+    public void strafeRight(double distance, int currentHeading) {
+        int encoders = (int) ((distance * motorEncoderTicksPerRevolution) / wheelCircumference);
+        motors.forEach(motor -> {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        });
+        while (Math.abs(lbMotor.getCurrentPosition()) < encoders) {
+            double power = Math.min(1, Math.min((encoders - Math.abs(lbMotor.getCurrentPosition())) / 200.0 + 0.1, Math.abs(lbMotor.getCurrentPosition()) / 200.0 + 0.1));
+            lbMotor.setPower(-power);
+            lfMotor.setPower(power);
+            rbMotor.setPower(power);
+            rfMotor.setPower(-power);
+            int imuX = (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180;
+            imuX = convertIMUHeading(imuX, imuX);
+        }
+    }
+   
+    public void strafeLeft(double distance, int currentHeading) {
+        int encoders = (int) ((distance * motorEncoderTicksPerRevolution) / wheelCircumference);
+        motors.forEach(motor -> {
+            motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        });
+        while (Math.abs(lbMotor.getCurrentPosition()) < encoders) {
+            double power = Math.min(1, Math.min((encoders - Math.abs(lbMotor.getCurrentPosition())) / 200.0 + 0.1, Math.abs(lbMotor.getCurrentPosition()) / 200.0 + 0.1));
+            lbMotor.setPower(power);
+            lfMotor.setPower(-power);
+            rbMotor.setPower(-power);
+            rfMotor.setPower(power);
+            int imuX = (int) imu.getRobotYawPitchRollAngles().getYaw(BNO055IMU.AngleUnit.DEGREES.toAngleUnit()) + 180;
+            imuX = convertIMUHeading(imuX, imuX);
+        }
+    }
+   
+    public void alignSpecimenWithHighRung() {
+        vArmRight.setPosition(vArmSpecimenAlign);
+        vsLeftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsLeftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        vsRightMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        vsLeftMotor.setTargetPosition(950);
+        vsRightMotor.setTargetPosition(-950);
+        vsLeftMotor.setPower(0.7);
+        vsRightMotor.setPower(-0.7);
+    }
+
+    public void hookSpecimen() {
+        vArmRight.setPosition(vArmSpecimenAlign);
+        vsLeftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsLeftMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        vsRightMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        vsLeftMotor.setTargetPosition(1050);
+        vsRightMotor.setTargetPosition(-1050);
+        vsLeftMotor.setPower(1);
+        vsRightMotor.setPower(-1);
+        while(vsLeftMotor.isBusy()){
+            
+        }
+        openVertClaw();
+    }
+
+    public void openVertClaw() {
+        vClaw.setPosition(vClawOpen);
+       
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void closeVertClaw() {
+        vClaw.setPosition(1);
+       
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void alignSampleWithHighBasket() {
+        vsLeftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        while (vsLeftMotor.getCurrentPosition() < vsSamplePlaceDistance) {
+            vsRightMotor.setPower(-0.5);
+            vsLeftMotor.setPower(0.5);
+        }
+        vsRightMotor.setPower(-0.001);
+        vsLeftMotor.setPower(0.001);
+        vArmRight.setPosition(0.8);
+    }
+
+    public void retractVertSlides() {
+        vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        vsRightMotor.setPower(1);
+        vsLeftMotor.setPower(-1);
+        sleep(1500);
+        vsRightMotor.setPower(0);
+        vsLeftMotor.setPower(0);
+    }
+
+    public void passover() {
+        hClaw.setPosition(0.05);
+        hClawPitch.setPosition(0.07);
+        hClawRoll.setPosition(0.45);
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        hServoLeft.setPosition(hSlidesRetraction);
+        hServoRight.setPosition(hSlidesRetraction);
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        vArmRight.setPosition(0.95);
+        vClaw.setPosition(0.6);
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        vClaw.setPosition(0.41);
+        hClaw.setPosition(0.2);
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        vArmRight.setPosition(vArmSampleAlign);
+    }
+
+    public void positionToPickSpecimen() {
+        vArmRight.setPosition(vArmSpecimenPickup);
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void extendSlidesToPickSpecimen() {
+        vsLeftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        while (vsLeftMotor.getCurrentPosition() < vsSlightExtend) {
+            vsRightMotor.setPower(-0.5);
+            vsLeftMotor.setPower(0.5);
+        }
+        vsRightMotor.setPower(-0.0005);
+        vsLeftMotor.setPower(0.0005);
+    }
+
+    public void openHorizontalClaw() {
+        hClaw.setPosition(hClawOpen);
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void closeHorizontalClaw() {
+        hClaw.setPosition(hClawClose);
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void rotateHorizontalClawDown() {
+        hClawPitch.setPosition(hClawDown);
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void extendHorizontalSlides() {
+        hClawPitch.setPosition(hClawUp);
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        hServoLeft.setPosition(hSlidesExtension);
+        hServoRight.setPosition(hSlidesExtension);
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void retractHorizontalSlides() {
+        hClawPitch.setPosition(hClawUp);
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        hServoLeft.setPosition(hSlidesRetraction);
+        hServoRight.setPosition(hSlidesRetraction);
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
