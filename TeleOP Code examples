@@ -1,1 +1,480 @@
+- Here is some TeleOP code posted by sidt124
+- Original repository: https://github.com/sidt124/FTCCode/blob/main/TeleOpFinalV2ControlsOverhaul.java
 
+-------------------------------------------------------------------------
+
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.hardware.IMU;
+
+
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name = "TeleOpFinalV2")
+public class TeleOpFinalV2ControlsOverhaul extends OpMode {
+    public class Vector2 {
+        public float x, y;
+
+        Vector2(float x, float y){
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    public class InputFrame {
+        float rightTriggerOffset;
+        boolean rightTrigger;
+        boolean rightTriggerDown;
+
+        boolean rightBumper;
+        boolean rightBumperDown;
+
+        float leftTriggerOffset;
+        boolean leftTrigger;
+        boolean leftTriggerDown;
+
+        boolean leftBumper;
+        boolean leftBumperDown;
+
+        Vector2 leftStickOffset;
+        boolean leftStick;
+        boolean leftStickDown;
+
+        Vector2 rightStickOffset;
+        boolean rightStick;
+        boolean rightStickDown;
+
+        boolean xButton;
+        boolean xButtonDown;
+
+        boolean aButton;
+        boolean aButtonDown;
+
+        boolean yButton;
+        boolean yButtonDown;
+
+        boolean bButton;
+        boolean bButtonDown;
+
+        boolean leftMenuButton;
+        boolean leftMenuButtonDown;
+
+        boolean dpadUpButton;
+        boolean dpadUpButtonDown;
+
+        boolean dpadRightButton;
+        boolean dpadRightButtonDown;
+
+        boolean dpadLeftButton;
+        boolean dpadLeftButtonDown;
+
+        boolean dpadDownButton;
+        boolean dpadDownButtonDown;
+    }
+
+    public static Servo hServoLeft;
+    public static Servo hServoRight;
+    public static Servo vArmRight;
+    public static DcMotor vsLeftMotor;
+    public static DcMotor vsRightMotor;
+    public static Servo hClawRoll;
+    public static Servo vClaw;
+    public static Servo hClaw;
+    public static DcMotor lfMotor;
+    public static DcMotor rfMotor;
+    public static DcMotor rbMotor;
+    public static DcMotor lbMotor;
+    double hSlidesExtension = 0.01;
+    double hSlidesRetraction = 0.86;
+    public static Servo hClawPitch;
+
+    public static InputFrame lastInputFrameA;
+    public static InputFrame lastInputFrameB;
+
+    boolean slowMode;
+    double slowModeSpeed = 0.5;
+    
+    boolean hClawLocked;
+    boolean vClawLocked;
+    
+    boolean hangMode;
+    
+    float slidePos = 0f;
+    long lastNanoTime = System.nanoTime();
+
+    long lastUpdatedDpadLeftTime = System.nanoTime();
+    long lastUpdatedDpadRightTime = System.nanoTime();
+    long lastUpdatedDpadDownTime = System.nanoTime();
+    long lastUpdatedDpadUpTime = System.nanoTime();
+
+    long lastUpdatedSlideExtensionTime = System.nanoTime();
+    long lastUpdatedSlideRetractionTime = System.nanoTime();
+
+    @Override
+    public void init() {
+        vArmRight = hardwareMap.get(Servo.class, "vArmRight");
+        vArmRight.setDirection(Servo.Direction.REVERSE);
+        vsLeftMotor = hardwareMap.get(DcMotor.class, "vsLeftMotor");
+        vsRightMotor = hardwareMap.get(DcMotor.class, "vsRightMotor");
+        vClaw = hardwareMap.get(Servo.class, "vClaw");
+        lfMotor = hardwareMap.get(DcMotor.class, "lfMotor");
+        rfMotor = hardwareMap.get(DcMotor.class, "rfMotor");
+        lbMotor = hardwareMap.get(DcMotor.class, "lbMotor");
+        rbMotor = hardwareMap.get(DcMotor.class, "rbMotor");
+        rfMotor.setDirection(DcMotor.Direction.REVERSE);
+        rbMotor.setDirection(DcMotor.Direction.REVERSE);
+        lbMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        lfMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rbMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rfMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        lbMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        lfMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        rbMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        rfMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        hServoLeft = hardwareMap.get(Servo.class, "hArmLeft");
+        hServoRight = hardwareMap.get(Servo.class, "hArmRight");
+        hClawPitch = hardwareMap.get(Servo.class, "hClawPitch");
+        hClawRoll = hardwareMap.get(Servo.class, "hClawRoll");
+        hClaw = hardwareMap.get(Servo.class, "hClaw");
+        hServoLeft.setDirection(Servo.Direction.FORWARD);
+        hServoRight.setDirection(Servo.Direction.REVERSE);
+        telemetry.addData("initialization", "success");
+    }
+
+    @Override
+    public void loop() {
+        double deltaTime = (System.nanoTime() - lastNanoTime) / 1e6;
+        
+        if (lastInputFrameA == null) {
+            // Start
+        
+        }
+        
+        InputFrame[] inputFrames = populateCurrentInputFrame();
+
+        InputFrame g1 = inputFrames[0];
+        InputFrame g2 = inputFrames[1];
+
+        if (g2.leftStickDown) {
+            slowMode = !slowMode;
+        }
+
+        float vertical = g2.leftStickOffset.y;
+        float strafe = g2.leftStickOffset.x;
+        float turn = g2.rightStickOffset.x;
+
+        lbMotor.setPower((vertical + strafe - turn) * (slowMode ? slowModeSpeed : 1.0));
+        rbMotor.setPower((vertical - strafe + turn) * (slowMode ? slowModeSpeed : 1.0));
+        rfMotor.setPower((vertical + strafe + turn) * (slowMode ? slowModeSpeed : 1.0));
+        lfMotor.setPower((vertical - strafe - turn) * (slowMode ? slowModeSpeed : 1.0));
+
+
+        if (g2.yButtonDown){
+            hClawLocked = !hClawLocked;
+        }
+
+        if (hClawLocked){
+            hClaw.setPosition(0.95);  
+        } else if (g2.rightTrigger){
+            hClaw.setPosition((0.95 * g2.rightTriggerOffset));
+            //sleep(500);
+
+            //hClawOpen = !hClawOpen;
+        }else{
+            hClaw.setPosition(0.1);
+        }
+
+
+        if(g2.dpadDownButton && ((double)(System.nanoTime() - lastUpdatedDpadDownTime) / 1e6) >= 0.01){
+            hClawPitch.setPosition(hClawPitch.getPosition() + 0.001);
+            lastUpdatedDpadDownTime = System.nanoTime();
+        }
+
+
+        if(g2.dpadUpButton && ((double)(System.nanoTime() - lastUpdatedDpadUpTime) / 1e6) >= 0.01){
+            hClawPitch.setPosition(hClawPitch.getPosition() - 0.001);
+            lastUpdatedDpadUpTime = System.nanoTime();
+        }
+
+
+        if(g2.dpadLeftButton && ((double)(System.nanoTime() - lastUpdatedDpadLeftTime) / 1e6) >= 0.01){
+            hClawRoll.setPosition(hClawRoll.getPosition() + 0.001);
+            lastUpdatedDpadLeftTime = System.nanoTime();
+        }
+
+        if(g2.dpadRightButton  && ((double)(System.nanoTime() - lastUpdatedDpadRightTime) / 1e6) >= 0.01){
+            hClawRoll.setPosition(hClawRoll.getPosition() - 0.001);
+            lastUpdatedDpadRightTime = System.nanoTime();
+        }
+
+        //Extend horizontal slides
+        if (g2.rightBumper && ((double)(System.nanoTime() - lastUpdatedSlideExtensionTime) / 1e6) >= 0.01) {
+            //hClawPitch.setPosition(hClawUp);
+            lastUpdatedSlideExtensionTime = System.nanoTime();
+            hServoLeft.setPosition(Math.max(-0.5, hServoLeft.getPosition() - 0.0005));
+            hServoRight.setPosition(Math.max(-0.5, hServoRight.getPosition() - 0.0005));
+            
+        }else if (g2.leftBumper && ((double)(System.nanoTime() - lastUpdatedSlideRetractionTime) / 1e6) >= 0.01) {
+            //Retract horizontal slides
+            //hClawPitch.setPosition(hClawUp);
+            lastUpdatedSlideRetractionTime = System.nanoTime();
+            hServoLeft.setPosition(Math.min(1, hServoLeft.getPosition() + 0.0005));
+            hServoRight.setPosition(Math.min(1, hServoRight.getPosition() + 0.0005));
+        }
+
+        
+        
+
+        if(g1.dpadRightButtonDown){
+            hClaw.setPosition(0.01);
+            hClawRoll.setPosition(.6);
+            hClawPitch.setPosition(0.35);
+            hClaw.setPosition(0.95);
+
+            sleep(100);
+            vArmRight.setPosition(1);
+            hServoLeft.setPosition(hSlidesRetraction);
+            hServoRight.setPosition(hSlidesRetraction);
+            sleep(1000);
+            vClaw.setPosition(0.6);
+            sleep(1500);
+            hClaw.setPosition(0.2);
+            vClaw.setPosition(0.41);
+            sleep(200);
+            vArmRight.setPosition(0.3);
+        }
+
+
+        if(g1.leftBumperDown){
+            vArmRight.setPosition(0);
+        }
+
+
+        if(g1.rightBumperDown){
+            vArmRight.setPosition(0.98);
+        }
+
+
+        if(g1.dpadUpButtonDown){
+            vArmRight.setPosition(0.15);
+            vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            setVArmHeight(3000);
+            vsRightMotor.setPower(-0.001);
+            vsLeftMotor.setPower(0.001);
+        }
+        
+        if (g1.aButtonDown && !hangMode) {
+            vsLeftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            vsRightMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            vClaw.setPosition(0.75);
+            sleep(200);
+            hangMode = true;
+            
+            setVArmHeight(800);
+            
+            vsRightMotor.setPower(-0.001);
+            vsLeftMotor.setPower(0.001);
+            vArmRight.setPosition(0.83);
+        }
+
+        //Slightly move vertical slides up to hook specimen on high rung
+        if (g1.bButtonDown) {
+            vArmRight.setPosition(0.83);
+            sleep(500);
+            vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            while (vsLeftMotor.getCurrentPosition() < 1450) {
+                vsRightMotor.setPower(-1);
+                vsLeftMotor.setPower(1);
+            }
+            vsRightMotor.setPower(-0.001);
+            vsLeftMotor.setPower(0.001);
+
+        }
+        
+        if (vClawLocked){
+            vClaw.setPosition(0.95);  
+        } else if (g1.rightTrigger){
+            vClaw.setPosition((0.75 * g1.rightTriggerOffset));
+            //sleep(500);
+
+            //hClawOpen = !hClawOpen;
+        }else{
+            vClaw.setPosition(0.4);
+        }
+        
+        if (g1.dpadDownButtonDown) {
+            vsLeftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            vsRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            vsRightMotor.setPower(1);
+            vsLeftMotor.setPower(-1);
+            sleep(1500);
+            vsRightMotor.setPower(0);
+            vsLeftMotor.setPower(0);
+        }
+        
+        if(gamepad1.dpad_left){
+            vArmRight.setPosition(0.06);
+            hClawRoll.setPosition(.6);
+            telemetry.addData("hclaw", hClawRoll.getPosition());
+            telemetry.update();
+        }
+
+
+        updateTelemetry();
+    }
+
+    private void updateTelemetry(){
+        telemetry.addData("g2_axis_y", gamepad2.left_stick_y);
+        telemetry.addData("g2_axis_x", gamepad2.left_stick_x);
+        telemetry.addData("g2_x", gamepad2.x ? "true" : "false");
+        telemetry.addData("g2_a", gamepad2.a ? "true" : "false");
+        telemetry.addData("g2_y", gamepad2.y ? "true" : "false");
+        telemetry.addData("g2_b", gamepad2.b ? "true" : "false");
+        telemetry.addData("g2_dpad_down", gamepad2.dpad_down ? "true" : "false");
+        telemetry.addData("g2_dpad_up", gamepad2.dpad_up ? "true" : "false");
+        telemetry.addData("g2_dpad_left", gamepad2.dpad_left ? "true" : "false");
+        telemetry.addData("g2_left_trigger", gamepad2.left_trigger);
+        telemetry.addData("g2_right_trigger", gamepad2.right_trigger);
+
+        telemetry.addData("g1_axis_y", gamepad1.left_stick_y);
+        telemetry.addData("g1_axis_x", gamepad1.left_stick_x);
+        telemetry.addData("g1_x", gamepad1.x ? "true" : "false");
+        telemetry.addData("g1_a", gamepad1.a ? "true" : "false");
+        telemetry.addData("g1_y", gamepad1.y ? "true" : "false");
+        telemetry.addData("g1_b", gamepad1.b ? "true" : "false");
+        telemetry.addData("g1_dpad_down", gamepad1.dpad_down ? "true" : "false");
+        telemetry.addData("g1_dpad_up", gamepad1.dpad_up ? "true" : "false");
+        telemetry.addData("g1_dpad_left", gamepad1.dpad_left ? "true" : "false");
+    }
+
+    private static void sleep(int millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private InputFrame[] populateCurrentInputFrame(){
+        InputFrame frm = new InputFrame();
+
+        frm.aButton = gamepad1.a;
+        frm.aButtonDown = gamepad1.a && (lastInputFrameA == null || !lastInputFrameA.aButton);
+
+        frm.bButton = gamepad1.b;
+        frm.bButtonDown = gamepad1.b && (lastInputFrameA == null || !lastInputFrameA.bButton);
+
+        frm.yButton = gamepad1.y;
+        frm.yButtonDown = gamepad1.y && (lastInputFrameA == null || !lastInputFrameA.yButton);
+
+        frm.xButton = gamepad1.x;
+        frm.xButtonDown = gamepad1.x && (lastInputFrameA == null || !lastInputFrameA.xButton);
+
+        frm.rightTriggerOffset = gamepad1.right_trigger;
+        frm.rightTrigger = gamepad1.right_trigger != 0f;
+        frm.rightTriggerDown = gamepad1.right_trigger != 0f && (lastInputFrameA == null || !lastInputFrameA.rightTrigger);
+
+        frm.leftTriggerOffset = gamepad1.left_trigger;
+        frm.leftTrigger = gamepad1.left_trigger  != 0f;
+        frm.leftTriggerDown = gamepad1.left_trigger != 0f && (lastInputFrameA == null || !lastInputFrameA.leftTrigger);
+
+        frm.rightBumper = gamepad1.right_bumper;
+        frm.rightBumperDown = gamepad1.right_bumper && (lastInputFrameA == null || !lastInputFrameA.rightBumper);
+
+        frm.leftBumper = gamepad1.left_bumper;
+        frm.leftBumperDown = gamepad1.left_bumper && (lastInputFrameA == null || !lastInputFrameA.leftBumper);
+
+        frm.leftStickOffset = new Vector2(gamepad1.left_stick_x, gamepad1.left_stick_y);
+        frm.leftStick = gamepad1.left_stick_button;
+        frm.leftStickDown = gamepad1.left_stick_button && (lastInputFrameA == null || !lastInputFrameA.leftStick);
+
+        frm.rightStickOffset = new Vector2(gamepad1.right_stick_x, gamepad1.right_stick_y);
+        frm.rightStick = gamepad1.right_stick_button;
+        frm.rightStickDown = gamepad1.right_stick_button && (lastInputFrameA == null || !lastInputFrameA.rightStick);
+
+        frm.leftMenuButton = gamepad1.back;
+        frm.leftMenuButtonDown = gamepad1.back && (lastInputFrameA == null || !lastInputFrameA.leftMenuButton);
+
+        frm.dpadDownButton = gamepad1.dpad_down;
+        frm.dpadDownButtonDown = gamepad1.dpad_down && (lastInputFrameA == null || !lastInputFrameA.dpadDownButton);
+
+        frm.dpadLeftButton = gamepad1.dpad_left;
+        frm.dpadLeftButtonDown = gamepad1.dpad_left && (lastInputFrameA == null || !lastInputFrameA.dpadLeftButton);
+
+        frm.dpadUpButton = gamepad1.dpad_up;
+        frm.dpadUpButtonDown = gamepad1.dpad_up && (lastInputFrameA == null || !lastInputFrameA.dpadUpButton);
+
+        frm.dpadRightButton = gamepad1.dpad_right;
+        frm.dpadRightButtonDown = gamepad1.dpad_right && (lastInputFrameA == null || !lastInputFrameA.dpadRightButton);
+
+        InputFrame frm2 = new InputFrame();
+
+        frm2.aButton = gamepad2.a;
+        frm2.aButtonDown = gamepad2.a && (lastInputFrameB == null || !lastInputFrameB.aButton);
+
+        frm2.bButton = gamepad2.b;
+        frm2.bButtonDown = gamepad2.b && (lastInputFrameB == null || !lastInputFrameB.bButton);
+
+        frm2.yButton = gamepad2.y;
+        frm2.yButtonDown = gamepad2.y && (lastInputFrameB == null || !lastInputFrameB.yButton);
+
+        frm2.xButton = gamepad2.x;
+        frm2.xButtonDown = gamepad2.x && (lastInputFrameB == null || !lastInputFrameB.xButton);
+
+        frm2.rightTriggerOffset = gamepad2.right_trigger;
+        frm2.rightTrigger = gamepad2.right_trigger != 0f;
+        frm2.rightTriggerDown = gamepad2.right_trigger != 0f && (lastInputFrameB == null || !lastInputFrameB.rightTrigger);
+
+        frm2.leftTriggerOffset = gamepad2.left_trigger;
+        frm2.leftTrigger = gamepad2.left_trigger  != 0f;
+        frm2.leftTriggerDown = gamepad2.left_trigger != 0f && (lastInputFrameB == null || !lastInputFrameB.leftTrigger);
+
+        frm2.rightBumper = gamepad2.right_bumper;
+        frm2.rightBumperDown = gamepad2.right_bumper && (lastInputFrameB == null || !lastInputFrameB.rightBumper);
+
+        frm2.leftBumper = gamepad2.left_bumper;
+        frm2.leftBumperDown = gamepad2.left_bumper && (lastInputFrameB == null || !lastInputFrameB.leftBumper);
+
+        frm2.leftStickOffset = new Vector2(gamepad2.left_stick_x, gamepad2.left_stick_y);
+        frm2.leftStick = gamepad2.left_stick_button;
+        frm2.leftStickDown = gamepad2.left_stick_button && (lastInputFrameB == null || !lastInputFrameB.leftStick);
+
+        frm2.rightStickOffset = new Vector2(gamepad2.right_stick_x, gamepad2.right_stick_y);
+        frm2.rightStick = gamepad2.right_stick_button;
+        frm2.rightStickDown = gamepad2.right_stick_button && (lastInputFrameB == null || !lastInputFrameB.rightStick);
+
+        frm2.leftMenuButton = gamepad2.back;
+        frm2.leftMenuButtonDown = gamepad2.back && (lastInputFrameB == null || !lastInputFrameB.leftMenuButton);
+
+        frm2.dpadDownButton = gamepad2.dpad_down;
+        frm2.dpadDownButtonDown = gamepad2.dpad_down && (lastInputFrameB == null || !lastInputFrameB.dpadDownButton);
+
+        frm2.dpadLeftButton = gamepad2.dpad_left;
+        frm2.dpadLeftButtonDown = gamepad2.dpad_left && (lastInputFrameB == null || !lastInputFrameB.dpadLeftButton);
+
+        frm2.dpadUpButton = gamepad2.dpad_up;
+        frm2.dpadUpButtonDown = gamepad2.dpad_up && (lastInputFrameB == null || !lastInputFrameB.dpadUpButton);
+
+        frm2.dpadRightButton = gamepad2.dpad_right;
+        frm2.dpadRightButtonDown = gamepad2.dpad_right && (lastInputFrameB == null || !lastInputFrameB.dpadRightButton);
+
+        lastInputFrameA = frm;
+        lastInputFrameB = frm2;
+
+        return new InputFrame[] {frm, frm2};
+    }
+    
+    private void setVArmHeight(int pos){
+        while (vsLeftMotor.getCurrentPosition() < pos) {
+            vsRightMotor.setPower(-1);
+            vsLeftMotor.setPower(1);
+        }
+    }
+
+}
